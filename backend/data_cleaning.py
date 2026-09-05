@@ -47,13 +47,19 @@ class DataCleaningPipeline:
     def compute_quality_metrics(observations: List[CleanedObservation]) -> dict:
         total = len(observations)
         if total == 0:
+            # PRE-EXISTING BUG (not introduced by this edit): this branch was
+            # missing "last_updated", which DataQualityMetrics requires — it
+            # was latent because dataset_engine.cleaned_observations is never
+            # actually empty in the current synthetic setup, so this path was
+            # never exercised. Fixed here since it's now required either way.
             return {
                 "overall_score": 100.0,
                 "completeness": 100.0,
                 "duplicate_rate": 0.0,
                 "missing_fare_rate": 0.0,
                 "outlier_rate": 0.0,
-                "collection_success_rate": 100.0
+                "collection_success_rate": None,
+                "last_updated": "N/A — no observations"
             }
 
         outliers = sum(1 for o in observations if o.outlier_flag)
@@ -62,9 +68,28 @@ class DataCleaningPipeline:
 
         outlier_rate = round((outliers / total) * 100, 2)
         missing_fare_rate = round((missing_fares / total) * 100, 2)
-        duplicate_rate = 1.2  # calculated from deduplication step
+
+        # PREVIOUSLY hardcoded to 1.2 with comment "calculated from
+        # deduplication step" — it was not actually calculated anywhere.
+        # deduplicate_observations() (above in this same file) already does
+        # the real work; it was just never called. Now it is.
+        deduped = DataCleaningPipeline.deduplicate_observations(observations)
+        duplicates_removed = total - len(deduped)
+        duplicate_rate = round((duplicates_removed / total) * 100, 2)
+
         completeness = round(100.0 - missing_fare_rate - 0.5, 1)
-        collection_success_rate = 96.5
+
+        # PREVIOUSLY hardcoded to 96.5 with no computation. Real collection
+        # success rate needs a numerator this function does not receive today
+        # (attempted-vs-succeeded counts from the scraper job, not the
+        # cleaned observations themselves). Rather than invent a formula OR
+        # pass None (which breaks DataQualityMetrics' `float` field — see
+        # models.py), return -1.0 as an explicit "not yet measurable" sentinel
+        # and surface it honestly in the API response instead of a silent
+        # constant. Replace with a real computation once
+        # scraper/flight_scraper_poc.py's run_scrape_job() is producing real
+        # attempt/success counts to pass in here.
+        collection_success_rate = -1.0
 
         overall_score = round(100.0 - (outlier_rate * 1.2 + missing_fare_rate * 3.0 + duplicate_rate * 0.5), 1)
 

@@ -162,12 +162,18 @@ class OTAMetric(BaseModel):
     fare_consistency_score: float
 
 class DataQualityMetrics(BaseModel):
-    overall_score: float = 94.0
-    completeness: float = 97.2
-    duplicate_rate: float = 1.2
-    missing_fare_rate: float = 0.8
-    outlier_rate: float = 2.1
-    collection_success_rate: float = 96.5
+    # PREVIOUSLY these 5 fields had hardcoded numeric defaults (94.0, 97.2,
+    # 1.2, 0.8, 2.1, 96.5) that looked like real measurements but were never
+    # computed from anything — see data_cleaning.py's compute_quality_metrics,
+    # which now actually computes duplicate_rate and outlier_rate from real
+    # data. Defaults removed so a caller must supply real values; collection_success_rate
+    # is Optional because it isn't measurable yet (see data_cleaning.py).
+    overall_score: float
+    completeness: float
+    duplicate_rate: float
+    missing_fare_rate: float
+    outlier_rate: float
+    collection_success_rate: Optional[float] = None
     last_updated: str
 
 class CollectionJobStatus(BaseModel):
@@ -198,3 +204,37 @@ class MethodologyConfig(BaseModel):
     outlier_threshold_iqr: float = 1.5
     lead_time_windows: List[int] = [1, 7, 15, 30, 45]
     missing_data_treatment: str = "Linear Interpolation & Forward Carry"
+
+class RealFareReference(BaseModel):
+    """A single real, sourced fare data point — see
+    data/real_reference_data.py for full sourcing detail. This is spot-
+    check reference data pulled from news reporting, NOT a systematic
+    dataset or a replacement for the CPI backtest in backtester.py."""
+    route_description: str
+    fare_inr: Optional[float] = None
+    fare_change_pct: Optional[float] = None
+    period_described: str
+    source_name: str
+    source_url: str
+    article_publish_date: str
+    notes: str = ""
+
+class RealTrafficReference(BaseModel):
+    metric_description: str
+    value: str
+    period_described: str
+    source_name: str
+    source_url: str
+    article_publish_date: str
+    notes: str = ""
+
+class RealReferenceDataResponse(BaseModel):
+    fare_data: List[RealFareReference]
+    traffic_data: List[RealTrafficReference]
+    known_gaps: str
+    disclaimer: str = (
+        "These are individually-sourced spot-check figures pulled from "
+        "public news reporting, not a systematically collected dataset. "
+        "See each entry's source_url and notes before treating any value "
+        "as precise or methodologically comparable to another entry."
+    )

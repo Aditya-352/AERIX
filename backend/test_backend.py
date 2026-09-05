@@ -5,6 +5,7 @@ from synthetic_engine import dataset_engine
 from data_cleaning import DataCleaningPipeline
 from index_engine import AirfareIndexEngine
 from backtester import IndexBacktester
+from scraper.dgca_fetcher import BenchmarkFetchError
 
 client = TestClient(app)
 
@@ -48,13 +49,43 @@ def test_index_calculation():
     assert first_point.base_index == 100.0
     assert first_point.index_value > 0
 
-def test_backtester():
+def test_backtester_requires_real_credentials():
+    """
+    PREVIOUSLY this test called run_backtest(series) with no arguments and
+    asserted the returned correlation was plausible-looking. That passed
+    because the old implementation fabricated a benchmark from noised APIx
+    values — the test was validating that the fabrication looked
+    reasonable, not that the index tracks anything real.
+
+    The rewritten run_backtest() requires a real annexure_xlsx_url (a
+    direct link to the current month's MoSPI CPI Annexure I release — see
+    scraper/dgca_fetcher.py) and raises BenchmarkFetchError without one,
+    rather than returning plausible-but-fake numbers. This test asserts
+    that refusal.
+    """
     engine = AirfareIndexEngine(dataset_engine.cleaned_observations)
     series = engine.calculate_index_series()
-    result = IndexBacktester.run_backtest(series)
-    assert result.mae >= 0
-    assert result.rmse >= 0
-    assert 0 <= result.pearson_correlation <= 1.0
+    with pytest.raises(BenchmarkFetchError):
+        IndexBacktester.run_backtest(series)
+
+
+def test_backtester_empty_series_raises():
+    """PREVIOUSLY an empty series silently returned hardcoded placeholder
+    numbers (apix_mean=107.5, pearson_correlation=0.978, etc.) instead of
+    signaling that no backtest could be run."""
+    with pytest.raises(ValueError):
+        IndexBacktester.run_backtest([])
+
+
+# NOTE: a real integration test — asserting actual MAE/RMSE/correlation
+# values against a live MoSPI Annexure I fetch — needs a current month's
+# real annexure_xlsx_url AND completion of dgca_fetcher.py's documented
+# "REMAINING VERIFICATION STEP" (confirming the real Excel column layout,
+# since the current offset is an untested guess — see that file's
+# docstring). Add that test once both are done; do not add one against an
+# unverified column offset now, since a "passing" test against a guessed
+# silently reintroduce exactly the false-confidence problem this rewrite
+# removes.
 
 def test_index_overview_and_endpoints():
     r1 = client.get("/api/v1/index/overview")

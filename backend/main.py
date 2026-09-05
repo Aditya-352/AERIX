@@ -1,19 +1,23 @@
+import os
 from fastapi import FastAPI, Query, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from typing import Optional, List, Dict
 import random
+from dataclasses import asdict
 from datetime import datetime
 
 from models import (
     SearchResponse, FlightCard, ProviderOffer, FareBreakdown,
     IndexValue, RouteBasketItem, LeadTimePoint, HeatmapItem,
     AirlineMetric, OTAMetric, DataQualityMetrics, CollectionJobStatus,
-    BacktestResult, MethodologyConfig
+    BacktestResult, MethodologyConfig, RealReferenceDataResponse
 )
 from synthetic_engine import dataset_engine, AIRLINES, PROVIDERS, DEFAULT_ROUTES
 from index_engine import AirfareIndexEngine
 from data_cleaning import DataCleaningPipeline
 from backtester import IndexBacktester
+from scraper.dgca_fetcher import BenchmarkFetchError
+from data.real_reference_data import REAL_FARE_DATA_POINTS, REAL_TRAFFIC_DATA_POINTS, KNOWN_GAPS
 
 app = FastAPI(
     title="AEROVA — India Airfare Price Intelligence Platform API",
@@ -181,6 +185,11 @@ def get_otas():
 @app.get("/api/v1/data-quality", response_model=DataQualityMetrics)
 def get_data_quality():
     q_dict = DataCleaningPipeline.compute_quality_metrics(dataset_engine.cleaned_observations)
+    # collection_success_rate is -1.0 when it hasn't been measured yet (see
+    # data_cleaning.py) — surface that as null in the API rather than a
+    # constant that looks like a real 96.5% success rate.
+    if q_dict.get("collection_success_rate", 0) < 0:
+        q_dict["collection_success_rate"] = None
     return DataQualityMetrics(**q_dict)
 
 @app.get("/api/v1/collection-monitoring", response_model=List[CollectionJobStatus])
@@ -198,11 +207,56 @@ def get_collection_monitoring():
 @app.get("/api/v1/backtest", response_model=BacktestResult)
 def get_backtest():
     series = index_engine.calculate_index_series()
-    return IndexBacktester.run_backtest(series)
+    try:
+        return IndexBacktester.run_backtest(
+            series,
+            annexure_xlsx_url=os.environ.get("MOSPI_ANNEXURE_XLSX_URL"),
+        )
+    except BenchmarkFetchError as e:
+        # PREVIOUSLY this endpoint always returned 200 with fabricated
+        # numbers. Now it returns a real, informative error until
+        # MOSPI_ANNEXURE_XLSX_URL is set to a valid, CURRENT month's
+        # Annexure I link (see scraper/dgca_fetcher.py — this URL changes
+        # every month and must be refreshed manually, it is not
+        # auto-discovered). This is a 503, not a 500 — it's a known,
+        # expected state (missing/stale external config), not an
+        # unhandled crash.
+        raise HTTPException(
+            status_code=503,
+            detail=f"Backtest unavailable: {e}"
+        )
 
 @app.get("/api/v1/methodology", response_model=MethodologyConfig)
 def get_methodology():
     return MethodologyConfig()
+
+@app.get("/api/v1/real-reference-data", response_model=RealReferenceDataResponse)
+def get_real_reference_data():
+    """
+    Returns real, individually-sourced fare and traffic figures pulled
+    from public news reporting (DGCA Tariff Monitoring Unit analyses,
+    ixigo fare reports, civilaviation.gov.in live stats) as of the search
+    performed 2026-09-05. See data/real_reference_data.py for full
+    sourcing detail, methodology caveats, and explicitly documented gaps.
+
+    THIS IS NOT: the CPI backtest (see /api/v1/backtest for that), a
+    scraped dataset, or a systematic time series. It is spot-check
+    reference data — useful for showing real prices were investigated and
+    for giving a presentation concrete, citable real numbers, not for
+    validating APIx programmatically.
+    """
+    # dataclasses.asdict() converts the plain @dataclass instances from
+    # real_reference_data.py into dicts, which Pydantic can validate into
+    # RealFareReference/RealTrafficReference. Passing the dataclass
+    # instances directly (without this conversion) fails at runtime —
+    # Pydantic does not treat a same-shaped dataclass as equivalent to its
+    # own BaseModel, even with matching fields. Caught by actually running
+    # this endpoint, not by inspection.
+    return RealReferenceDataResponse(
+        fare_data=[asdict(d) for d in REAL_FARE_DATA_POINTS],
+        traffic_data=[asdict(d) for d in REAL_TRAFFIC_DATA_POINTS],
+        known_gaps=KNOWN_GAPS,
+    )
 
 @app.get("/api/v1/alerts")
 def get_alerts():
