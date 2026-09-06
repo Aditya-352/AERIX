@@ -65,4 +65,13 @@ class MethodologyConfig(BaseModel):
     lead_time_windows: List[int]=[1,7,15,30,45]; missing_data_treatment: str="No synthetic imputation; carry only within documented publication rule"
 
 class DataQualityMetrics(BaseModel):
-    overall_score: float; completeness: float; duplicate_rate: float; missing_fare_rate: float; outlier_rate: float; collection_success_rate: Optional[float]; last_updated: Optional[str]
+    overall_score: float
+    completeness: float
+    duplicate_rate: float
+    missing_fare_rate: float
+    outlier_rate: float
+    collection_success_rate: Optional[float] = None
+    last_updated: Optional[str] = None
+    scoring_explanation: Optional[str] = None
+    true_duplicate_count: Optional[int] = None
+    total_observations: Optional[int] = None
