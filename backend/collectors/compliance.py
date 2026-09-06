@@ -1,4 +1,5 @@
 from __future__ import annotations
+import urllib.request
 from urllib.parse import urlparse
 from urllib.robotparser import RobotFileParser
 
@@ -9,7 +10,13 @@ def assert_robots_allowed(url: str, user_agent: str, timeout: int = 10) -> None:
     robots=f"{parsed.scheme}://{parsed.netloc}/robots.txt"
     rp=RobotFileParser()
     rp.set_url(robots)
-    try: rp.read()
-    except Exception as exc: raise ComplianceBlocked(f"Cannot verify robots.txt for {parsed.netloc}: {exc}") from exc
+    try:
+        req = urllib.request.Request(robots, headers={"User-Agent": user_agent})
+        with urllib.request.urlopen(req, timeout=timeout) as resp:
+            content = resp.read().decode('utf-8', errors='ignore').splitlines()
+            rp.parse(content)
+    except Exception as exc:
+        raise ComplianceBlocked(f"Cannot verify robots.txt for {parsed.netloc}: {exc}") from exc
     if not rp.can_fetch(user_agent, url):
         raise ComplianceBlocked(f"robots.txt disallows this user agent for {url}")
+
