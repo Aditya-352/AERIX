@@ -9,6 +9,7 @@ import {
   ResponsiveContainer, LineChart, Line, XAxis, YAxis, Tooltip, CartesianGrid, Legend,
   AreaChart, Area
 } from 'recharts';
+import { API_BASE_URL } from '@/lib/config';
 
 export default function GovernmentDashboard() {
   const [activeTab, setActiveTab] = useState<'overview' | 'apix' | 'routes' | 'leadtime' | 'airlines' | 'quality' | 'backtest' | 'api' | 'admin'>('overview');
@@ -37,16 +38,16 @@ export default function GovernmentDashboard() {
         resOverview, resSeries, resRoutes, resLead, resHeat,
         resAir, resOtas, resQual, resBack, resAlerts
       ] = await Promise.all([
-        fetch('http://127.0.0.1:8000/api/v1/index/overview').then(r => r.json()),
-        fetch('http://127.0.0.1:8000/api/v1/index/series').then(r => r.json()),
-        fetch('http://127.0.0.1:8000/api/v1/routes').then(r => r.json()),
-        fetch('http://127.0.0.1:8000/api/v1/lead-time').then(r => r.json()),
-        fetch('http://127.0.0.1:8000/api/v1/heatmap').then(r => r.json()),
-        fetch('http://127.0.0.1:8000/api/v1/airlines').then(r => r.json()),
-        fetch('http://127.0.0.1:8000/api/v1/otas').then(r => r.json()),
-        fetch('http://127.0.0.1:8000/api/v1/data-quality').then(r => r.json()),
-        fetch('http://127.0.0.1:8000/api/v1/backtest').then(r => r.json()),
-        fetch('http://127.0.0.1:8000/api/v1/alerts').then(r => r.json()),
+        fetch(`${API_BASE_URL}/api/v1/index/overview`).then(r => r.json()),
+        fetch(`${API_BASE_URL}/api/v1/index/series`).then(r => r.json()),
+        fetch(`${API_BASE_URL}/api/v1/routes`).then(r => r.json()),
+        fetch(`${API_BASE_URL}/api/v1/lead-time`).then(r => r.json()),
+        fetch(`${API_BASE_URL}/api/v1/heatmap`).then(r => r.json()),
+        fetch(`${API_BASE_URL}/api/v1/airlines`).then(r => r.json()),
+        fetch(`${API_BASE_URL}/api/v1/otas`).then(r => r.json()),
+        fetch(`${API_BASE_URL}/api/v1/data-quality`).then(r => r.json()),
+        fetch(`${API_BASE_URL}/api/v1/backtest`).then(r => r.json()),
+        fetch(`${API_BASE_URL}/api/v1/alerts`).then(r => r.json()),
       ]);
 
       setOverview(resOverview);
@@ -511,13 +512,13 @@ export default function GovernmentDashboard() {
             <p className="font-bold text-slate-900">Available REST API Endpoints:</p>
             <div className="space-y-2">
               <code className="block p-2.5 bg-slate-50 rounded border border-slate-200 text-blue-700 font-bold">
-                GET http://127.0.0.1:8000/api/v1/index/series
+                GET {API_BASE_URL}/api/v1/index/series
               </code>
               <code className="block p-2.5 bg-slate-50 rounded border border-slate-200 text-blue-700 font-bold">
-                GET http://127.0.0.1:8000/api/v1/lead-time?route_id=DEL-BOM
+                GET {API_BASE_URL}/api/v1/lead-time?route_id=DEL-BOM
               </code>
               <code className="block p-2.5 bg-slate-50 rounded border border-slate-200 text-blue-700 font-bold">
-                GET http://127.0.0.1:8000/api/v1/backtest
+                GET {API_BASE_URL}/api/v1/backtest
               </code>
             </div>
           </div>

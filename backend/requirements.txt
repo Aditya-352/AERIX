@@ -5,3 +5,14 @@ pandas>=2.0.0
 numpy>=1.24.0
 scipy>=1.10.0
 pytest>=7.0.0
+
+# Added for real data collection — the problem statement's core requirement.
+# None of these existed before; this file previously had zero scraping
+# dependencies despite the project needing to scrape.
+playwright>=1.40.0   # handles JS-rendered OTA/airline pages
+httpx>=0.25.0        # for scraper/dgca_fetcher.py's MoSPI Annexure fetch
+openpyxl>=3.1.0      # parses the .xlsx MoSPI publishes CPI data in
+
+# After installing, also run: playwright install chromium
+# (Playwright needs its browser binaries downloaded separately — pip install
+# alone is not sufficient, a common first-run trip-up worth flagging now.)

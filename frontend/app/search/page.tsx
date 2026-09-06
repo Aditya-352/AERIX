@@ -4,6 +4,7 @@ import React, { useState, useEffect } from 'react';
 import { useSearchParams } from 'next/navigation';
 import { Plane, Filter, ArrowUpDown, ChevronDown, ChevronUp, CheckCircle, ExternalLink, Clock, AlertCircle, ShieldCheck } from 'lucide-react';
 import { ResponsiveContainer, LineChart, Line, XAxis, YAxis, Tooltip, CartesianGrid } from 'recharts';
+import { API_BASE_URL } from '@/lib/config';
 
 interface FareBreakdown {
   base_fare: number;
@@ -67,7 +68,7 @@ export default function SearchPage() {
   const fetchFlights = async () => {
     setLoading(true);
     try {
-      const res = await fetch(`http://127.0.0.1:8000/api/v1/search?origin=${origin}&destination=${destination}&departure_date=${departureDate}`);
+      const res = await fetch(`${API_BASE_URL}/api/v1/search?origin=${origin}&destination=${destination}&departure_date=${departureDate}`);
       const data = await res.json();
       setFlights(data.flights || []);
     } catch (err) {
